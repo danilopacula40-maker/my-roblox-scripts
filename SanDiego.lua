@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Full Hold Farm",
+   Name = "San Diego Border RP | Strict Instant TP",
    LoadingTitle = "Завантаження...",
-   LoadingSubtitle = "Auto-Buy & Sell Fixed",
+   LoadingSubtitle = "No-Fly Instant Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
@@ -13,28 +13,36 @@ local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Жорстко закріплені координати
+-- Точні координати (за потреби оновлюйте тут)
 local BuyPos = Vector3.new(6820.7, 18.0, 16.6)
 local SellPos = Vector3.new(-79.56, 38.0, 428.46)
 local LaunderPos = Vector3.new(6806.9, 16.0, -36.34)
 
 local IsFarming = false
 
--- Функція миттєвого телепорту
+-- Абсолютно жорсткий миттєвий телепорт (виключає будь-який політ)
 local function instantTP(targetPos)
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
    local hrp = char.HumanoidRootPart
+   local hum = char:FindFirstChildOfClass("Humanoid")
 
+   -- Зупиняємо будь-яку фізику, щоб персонаж не летів
+   if hum then hum.PlatformStand = true end
    hrp.AssemblyLinearVelocity = Vector3.zero
-   hrp.CFrame = CFrame.new(targetPos)
-   
+   hrp.AssemblyAngularVelocity = Vector3.zero
+
+   -- Миттєвий перенос
+   char:PivotTo(CFrame.new(targetPos))
+
+   -- Заморожуємо на мілісекунду від античіту
    hrp.Anchored = true
-   task.wait(0.15)
+   task.wait(0.1)
    hrp.Anchored = false
+   if hum then hum.PlatformStand = false end
 end
 
--- Універсальна функція взаємодії (затискає E певну кількість разів)
+-- Універсальна взаємодія (затискає E потрібну кількість разів)
 local function performAction(times, holdDuration)
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -42,12 +50,11 @@ local function performAction(times, holdDuration)
    for i = 1, (times or 1) do
       if not IsFarming then break end
       
-      -- Шукаємо найближчий ProximityPrompt
       local targetPrompt = nil
       for _, prompt in pairs(Workspace:GetDescendants()) do
          if prompt:IsA("ProximityPrompt") then
             local dist = (char.HumanoidRootPart.Position - prompt.Parent:GetPivot().Position).Magnitude
-            if dist <= 25 then
+            if dist <= 30 then
                targetPrompt = prompt
                break
             end
@@ -58,12 +65,11 @@ local function performAction(times, holdDuration)
          fireproximityprompt(targetPrompt)
       end
 
-      -- Затискаємо клавішу E
       VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
       task.wait(holdDuration or 1.2)
       VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 
-      task.wait(0.4) -- Пауза між повторами
+      task.wait(0.3)
    end
 end
 
@@ -73,7 +79,7 @@ end
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "Запустити Повний Авто-Фарм",
+   Name = "Запустити Миттєвий Телепорт-Фарм",
    CurrentValue = false,
    Callback = function(val)
       IsFarming = val
@@ -83,23 +89,23 @@ FarmTab:CreateToggle({
                -- 1. ТП на закупівлю (Купуємо 5 кілець)
                instantTP(BuyPos)
                if not IsFarming then break end
-               task.wait(0.5)
-               performAction(5, 1.2) -- Цикл на 5 покупок по 1.2 сек затискання E
-               task.wait(0.5)
+               task.wait(0.3)
+               performAction(5, 1.2)
+               task.wait(0.3)
 
-               -- 2. ТП на продаж (Затискаємо кілька разів, щоб точно все здати і отримати гроші)
+               -- 2. ТП на продаж (Здаємо кільця та отримуємо гроші)
                instantTP(SellPos)
                if not IsFarming then break end
-               task.wait(0.5)
-               performAction(5, 1.2) -- 5 спроб продажу
-               task.wait(0.5)
+               task.wait(0.3)
+               performAction(5, 1.2)
+               task.wait(0.3)
 
-               -- 3. ТП на відмивання (Затискаємо відмивання грошей)
+               -- 3. ТП на відмивання
                instantTP(LaunderPos)
                if not IsFarming then break end
+               task.wait(0.3)
+               performAction(3, 1.5)
                task.wait(0.5)
-               performAction(3, 1.5) -- 3 спроби відмивання
-               task.wait(1.0)
             end
          end)
       end
