@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Strict Instant TP",
+   Name = "San Diego Border RP | Hard Instant TP",
    LoadingTitle = "Завантаження...",
-   LoadingSubtitle = "No-Fly Instant Edition",
+   LoadingSubtitle = "Hard Teleport Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
@@ -20,26 +20,36 @@ local LaunderPos = Vector3.new(6806.9, 16.0, -36.34)
 
 local IsFarming = false
 
--- Абсолютно жорсткий миттєвий телепорт (виключає будь-який політ)
+-- Жорсткий телепорт із повним блокуванням фізики та анімацій ходьби
 local function instantTP(targetPos)
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
    local hrp = char.HumanoidRootPart
    local hum = char:FindFirstChildOfClass("Humanoid")
 
-   -- Зупиняємо будь-яку фізику, щоб персонаж не летів
-   if hum then hum.PlatformStand = true end
+   -- Повністю вимикаємо рух гуманоїда, щоб гра не намагалася туди «бігти»
+   if hum then
+      hum.PlatformStand = true
+      hum.WalkSpeed = 0
+   end
+
+   -- Скидаємо будь-яку інерцію
    hrp.AssemblyLinearVelocity = Vector3.zero
    hrp.AssemblyAngularVelocity = Vector3.zero
 
-   -- Миттєвий перенос
+   -- Миттєвий перенос через подвійне оновлення координат
+   hrp.CFrame = CFrame.new(targetPos)
    char:PivotTo(CFrame.new(targetPos))
 
-   -- Заморожуємо на мілісекунду від античіту
+   -- Заморожуємо хендлер, щоб сервер прийняв точку без інтерполяції
    hrp.Anchored = true
-   task.wait(0.1)
+   task.wait(0.15)
    hrp.Anchored = false
-   if hum then hum.PlatformStand = false end
+
+   if hum then
+      hum.PlatformStand = false
+      hum.WalkSpeed = 16 -- Повертаємо стандартну швидкість
+   end
 end
 
 -- Універсальна взаємодія (затискає E потрібну кількість разів)
@@ -79,7 +89,7 @@ end
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "Запустити Миттєвий Телепорт-Фарм",
+   Name = "Запустити Хард-Телепорт Фарм",
    CurrentValue = false,
    Callback = function(val)
       IsFarming = val
