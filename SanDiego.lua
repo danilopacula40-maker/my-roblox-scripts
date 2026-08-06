@@ -1,9 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Full Auto-Farm",
-   LoadingTitle = "Завантаження скрипта...",
-   LoadingSubtitle = "Full Code Edition",
+   Name = "San Diego Border RP | Instant TP Farm",
+   LoadingTitle = "Завантаження...",
+   LoadingSubtitle = "Instant Teleport Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
@@ -13,32 +13,30 @@ local Workspace = game:GetService("Workspace")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Збережені базові координати
+-- Жорстко закріплені координати
 local BuyPos = Vector3.new(6820.7, 18.0, 16.6)
 local SellPos = Vector3.new(-79.56, 38.0, 428.46)
 local LaunderPos = Vector3.new(6806.9, 16.0, -36.34)
-local BankPos = Vector3.new(6820.7, 18.0, 16.6) -- Резервна точка для банку/банкомату
 
 local IsFarming = false
-local AutoBank = false
 
--- Функція точного миттєвого телепорту без збоїв фізики
+-- Функція МИТТЄВОГО ТЕЛЕПОРТУ (без польоту)
 local function instantTP(targetPos)
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
    local hrp = char.HumanoidRootPart
 
-   -- Скидаємо будь-яку швидкість і задаємо позицію
+   -- ТЕЛЕПОРТ: Одразу переміщуємо CFrame у потрібну позицію
    hrp.AssemblyLinearVelocity = Vector3.zero
    hrp.CFrame = CFrame.new(targetPos)
    
-   -- Заморожуємо на 0.15 сек проти відкидання античітом
+   -- Короткочасна фіксація (0.1 сек), щоб сервер не відкинув назад
    hrp.Anchored = true
-   task.wait(0.15)
+   task.wait(0.1)
    hrp.Anchored = false
 end
 
--- Взаємодія з промптом або клавішею E
+-- Взаємодія з продавцем (ProximityPrompt або E)
 local function interact()
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -59,7 +57,7 @@ local function interact()
    end
 
    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-   task.wait(1.0)
+   task.wait(0.8)
    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
@@ -69,102 +67,59 @@ end
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "Запустити Повний Авто-Фарм",
+   Name = "Запустити Миттєвий Авто-Фарм",
    CurrentValue = false,
    Callback = function(val)
       IsFarming = val
       if val then
          task.spawn(function()
             while IsFarming do
-               -- 1. Зняття / Банкомат (якщо увімкнено)
-               if AutoBank and IsFarming then
-                  instantTP(BankPos)
-                  task.wait(0.4)
-                  interact()
-                  task.wait(1.2)
-               end
-
-               -- 2. Закупівля
-               if not IsFarming then break end
+               -- 1. Миттєвий телепорт на Закупівлю
                instantTP(BuyPos)
-               task.wait(0.4)
-               interact()
-               task.wait(1.2)
-
-               -- 3. Продаж
                if not IsFarming then break end
+               task.wait(0.3)
+               interact()
+               task.wait(1.0)
+
+               -- 2. Миттєвий телепорт на Продаж
                instantTP(SellPos)
-               task.wait(0.4)
-               interact()
-               task.wait(1.2)
-
-               -- 4. Відмивання
                if not IsFarming then break end
-               instantTP(LaunderPos)
-               task.wait(0.4)
+               task.wait(0.3)
                interact()
-               task.wait(1.2)
+               task.wait(1.0)
+
+               -- 3. Миттєвий телепорт на Відмивання
+               instantTP(LaunderPos)
+               if not IsFarming then break end
+               task.wait(0.3)
+               interact()
+               task.wait(1.0)
             end
          end)
       end
-   end,
-})
-
-FarmTab:CreateToggle({
-   Name = "Включити забір грошей (Банк)",
-   CurrentValue = false,
-   Callback = function(val)
-      AutoBank = val
-   end,
+   end
 })
 
 -- ========================================================
--- 2. ВКЛАДКА: НАЛАШТУВАННЯ ТОЧОК (Збереження на місці)
+-- 2. ВКЛАДКА: ОТРЕМАННЯ КООРДИНАТ (F9)
 -- ========================================================
-local SetupTab = Window:CreateTab("Налаштування Точок", 4483362458)
+local CoordsTab = Window:CreateTab("Координати", 4483362458)
 
-SetupTab:CreateButton({
-   Name = "Записати ПОТОЧНЕ місце як ЗАКУПІВЛЮ",
+CoordsTab:CreateButton({
+   Name = "Вивести поточні координати в F9",
    Callback = function()
       if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         BuyPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Точка 1", Content = "Закупівлю оновлено!", Duration = 3 })
+         local pos = LocalPlayer.Character.HumanoidRootPart.Position
+         local formattedPos = string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)
+         print("--- ТЕПЕРЕШНІ КООРДИНАТИ ---")
+         print(formattedPos)
+         Rayfield:Notify({ Title = "Координати у F9", Content = formattedPos, Duration = 4 })
       end
-   end,
-})
-
-SetupTab:CreateButton({
-   Name = "Записати ПОТОЧНЕ місце як ПРОДАЖ",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         SellPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Точка 2", Content = "Продаж оновлено!", Duration = 3 })
-      end
-   end,
-})
-
-SetupTab:CreateButton({
-   Name = "Записати ПОТОЧНЕ місце як ВІДМИВАННЯ",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         LaunderPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Точка 3", Content = "Відмивання оновлено!", Duration = 3 })
-      end
-   end,
-})
-
-SetupTab:CreateButton({
-   Name = "Записати ПОТОЧНЕ місце як БАНК / ЗНІМАННЯ",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         BankPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Точка Банку", Content = "Знімання грошей оновлено!", Duration = 3 })
-      end
-   end,
+   end
 })
 
 -- ========================================================
--- 3. ВКЛАДКА: СЕРВІС
+-- 3. ВКЛАДКА: НАЛАШТУВАННЯ
 -- ========================================================
 local SettingsTab = Window:CreateTab("Налаштування", 4483362458)
 SettingsTab:CreateButton({
@@ -172,5 +127,5 @@ SettingsTab:CreateButton({
    Callback = function()
       IsFarming = false
       Rayfield:Destroy()
-   end,
+   end
 })
