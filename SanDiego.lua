@@ -3,7 +3,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Window = Rayfield:CreateWindow({
    Name = "San Diego Border RP | Ultimate Hub",
    LoadingTitle = "Завантаження скрипта...",
-   LoadingSubtitle = "by Assistant",
+   LoadingSubtitle = "by ya_gay",
    ConfigurationSaving = { Enabled = false }
 })
 
@@ -14,40 +14,75 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
+-- Координати фарму (за потреби можна скоригувати під карту)
+local BUY_RINGS_POS = Vector3.new(450, 10, 850)
+local SELL_PARKING_POS = Vector3.new(-120, 15, -300)
+
+-- Функція плавного переміщення (Float / Tween)
+local function floatTo(targetPos, speed)
+   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+      local hrp = LocalPlayer.Character.HumanoidRootPart
+      local distance = (hrp.Position - targetPos).Magnitude
+      local duration = distance / (speed or 120)
+
+      local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+      local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
+      tween:Play()
+      tween.Completed:Wait()
+   end
+end
+
 -- ========================================================
 -- 1. ВКЛАДКА: АВТО-ФАРМ
 -- ========================================================
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
-local FarmBandits = false
-local FarmPolice = false
+local FarmRings = false
+local FarmSpeed = 120
 
-FarmTab:CreateToggle({
-   Name = "Авто-Фарм (Бандити / Друк)",
-   CurrentValue = false,
+FarmTab:CreateSlider({
+   Name = "Швидкість полету (Float Speed)",
+   Range = {50, 250},
+   Increment = 10,
+   Suffix = " studs/s",
+   CurrentValue = 120,
+   Flag = "FarmSpeedSlider",
    Callback = function(Value)
-      FarmBandits = Value
-      if Value then
-         FarmPolice = false
-         task.spawn(function()
-            while FarmBandits do
-               print("Фарм бандитів...")
-               task.wait(1)
-            end
-         end)
-      end
+      FarmSpeed = Value
    end,
 })
 
 FarmTab:CreateToggle({
-   Name = "Авто-Фарм (Поліція / Патруль)",
+   Name = "Авто-Фарм Бандитів (Закуп Кільця -> Парковка -> Продаж)",
    CurrentValue = false,
    Callback = function(Value)
-      FarmPolice = Value
+      FarmRings = Value
       if Value then
-         FarmBandits = false
          task.spawn(function()
-            while FarmPolice do
-               print("Фарм поліції...")
+            while FarmRings do
+               -- 1. Ллетимо до закупівлі кілець
+               floatTo(BUY_RINGS_POS, FarmSpeed)
+               if not FarmRings then break end
+               task.wait(0.5)
+
+               -- Спроба купівлі (Взаємодія з промптом / ремоутом)
+               for _, obj in pairs(Workspace:GetDescendants()) do
+                  if obj:IsA("ProximityPrompt") and (obj.Parent.Name:lower():find("ring") or obj.Parent.Name:lower():find("кольц") or obj.Parent.Name:lower():find("dealer")) then
+                     fireproximityprompt(obj)
+                  end
+               end
+               task.wait(1)
+
+               -- 2. Ллетимо на парковку для продажу
+               floatTo(SELL_PARKING_POS, FarmSpeed)
+               if not FarmRings then break end
+               task.wait(0.5)
+
+               -- Спроба продажу
+               for _, obj in pairs(Workspace:GetDescendants()) do
+                  if obj:IsA("ProximityPrompt") and (obj.Parent.Name:lower():find("sell") or obj.Parent.Name:lower():find("parking") or obj.Parent.Name:lower():find("покуп")) then
+                     fireproximityprompt(obj)
+                  end
+               end
                task.wait(1)
             end
          end)
@@ -240,53 +275,19 @@ CombatTab:CreateToggle({
 -- ========================================================
 local TeleportTab = Window:CreateTab("Телепорти", 4483362458)
 
--- Плавний телепорт через Tween для обходу античиту
-local function teleportTo(targetCFrame)
-   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-      local hrp = LocalPlayer.Character.HumanoidRootPart
-      local distance = (hrp.Position - targetCFrame.Position).Magnitude
-      local speed = 150
-      local duration = distance / speed
-
-      local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-      local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-      tween:Play()
-   end
-end
-
 TeleportTab:CreateButton({
    Name = "Телепорт: Головний Кордон",
-   Callback = function() teleportTo(CFrame.new(120, 15, -450)) end,
+   Callback = function() floatTo(Vector3.new(120, 15, -450), 200) end,
 })
 
 TeleportTab:CreateButton({
    Name = "Телепорт: Поліцейський Участок",
-   Callback = function() teleportTo(CFrame.new(-340, 12, 210)) end,
+   Callback = function() floatTo(Vector3.new(-340, 12, 210), 200) end,
 })
 
 TeleportTab:CreateButton({
    Name = "Телепорт: Спавн Бандитів",
-   Callback = function() teleportTo(CFrame.new(520, 10, 890)) end,
-})
-
-local SavedCFrame = nil
-TeleportTab:CreateButton({
-   Name = "Зберегти поточну позицію",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         SavedCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-         Rayfield:Notify({ Title = "Телепорт", Content = "Позицію збережено!", Duration = 2 })
-      end
-   end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Телепорт до збереженої позиції",
-   Callback = function()
-      if SavedCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         teleportTo(SavedCFrame)
-      end
-   end,
+   Callback = function() floatTo(Vector3.new(520, 10, 890), 200) end,
 })
 
 -- ========================================================
