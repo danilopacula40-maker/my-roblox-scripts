@@ -1,79 +1,44 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Auto-Farm",
-   LoadingTitle = "Завантаження...",
-   LoadingSubtitle = "by ya_gay",
+   Name = "San Diego Border RP | Full Auto-Farm",
+   LoadingTitle = "Завантаження скрипта...",
+   LoadingSubtitle = "Full Code Edition",
    ConfigurationSaving = { Enabled = false }
 })
 
 -- Сервіси Roblox
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Збережені координати з ваших скріншотів
-local BuyPos = Vector3.new(6820.7, 20.15, 16.6)
-local SellPos = Vector3.new(-79.56, 40.24, 428.46)
+-- Збережені базові координати
+local BuyPos = Vector3.new(6820.7, 18.0, 16.6)
+local SellPos = Vector3.new(-79.56, 38.0, 428.46)
 local LaunderPos = Vector3.new(6806.9, 16.0, -36.34)
+local BankPos = Vector3.new(6820.7, 18.0, 16.6) -- Резервна точка для банку/банкомату
 
 local IsFarming = false
-local FlySpeed = 100
-local NoclipConn = nil
+local AutoBank = false
 
--- Функція Noclip (проходження крізь стіни під час руху)
-local function enableNoclip(state)
-   if state then
-      if not NoclipConn then
-         NoclipConn = RunService.Stepped:Connect(function()
-            if LocalPlayer.Character then
-               for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
-                  if v:IsA("BasePart") then
-                     v.CanCollide = false
-                  end
-               end
-            end
-         end)
-      end
-   else
-      if NoclipConn then
-         NoclipConn:Disconnect()
-         NoclipConn = nil
-      end
-   end
-end
-
--- Надійна функція перельоту строго до вказаних координат
-local function moveToPos(targetPos)
+-- Функція точного миттєвого телепорту без збоїв фізики
+local function instantTP(targetPos)
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
    local hrp = char.HumanoidRootPart
 
-   enableNoclip(true)
-
-   while IsFarming and (hrp.Position - targetPos).Magnitude > 4 do
-      if not IsFarming then break end
-
-      local currentPos = hrp.Position
-      local distance = (currentPos - targetPos).Magnitude
-      local step = math.min(distance, FlySpeed * 0.02)
-      
-      local nextPos = currentPos + (targetPos - currentPos).Unit * step
-      hrp.CFrame = CFrame.lookAt(nextPos, targetPos)
-      
-      task.wait(0.01)
-   end
-
-   -- Гасимо інерцію після прильоту або зупинки
-   if hrp then
-      hrp.AssemblyLinearVelocity = Vector3.zero
-   end
-   enableNoclip(false)
+   -- Скидаємо будь-яку швидкість і задаємо позицію
+   hrp.AssemblyLinearVelocity = Vector3.zero
+   hrp.CFrame = CFrame.new(targetPos)
+   
+   -- Заморожуємо на 0.15 сек проти відкидання античітом
+   hrp.Anchored = true
+   task.wait(0.15)
+   hrp.Anchored = false
 end
 
--- Автоматична взаємодія з ProximityPrompt або клавішею E
+-- Взаємодія з промптом або клавішею E
 local function interact()
    local char = LocalPlayer.Character
    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
@@ -82,7 +47,7 @@ local function interact()
    for _, prompt in pairs(Workspace:GetDescendants()) do
       if prompt:IsA("ProximityPrompt") then
          local dist = (char.HumanoidRootPart.Position - prompt.Parent:GetPivot().Position).Magnitude
-         if dist <= 25 then
+         if dist <= 20 then
             targetPrompt = prompt
             break
          end
@@ -94,7 +59,7 @@ local function interact()
    end
 
    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-   task.wait(1.2)
+   task.wait(1.0)
    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
@@ -103,107 +68,109 @@ end
 -- ========================================================
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
 
-FarmTab:CreateSlider({
-   Name = "Швидкість польоту",
-   Range = {30, 250},
-   Increment = 10,
-   Suffix = " studs/s",
-   CurrentValue = 100,
-   Callback = function(val) FlySpeed = val end,
-})
-
 FarmTab:CreateToggle({
-   Name = "Запустити Авто-Фарм",
+   Name = "Запустити Повний Авто-Фарм",
    CurrentValue = false,
    Callback = function(val)
       IsFarming = val
-      if not val then
-         enableNoclip(false)
-         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity = Vector3.zero
-         end
-      else
+      if val then
          task.spawn(function()
             while IsFarming do
-               -- 1. Точка закупівлі
-               moveToPos(BuyPos)
-               if not IsFarming then break end
-               task.wait(0.5)
-               interact()
-               task.wait(1.5)
+               -- 1. Зняття / Банкомат (якщо увімкнено)
+               if AutoBank and IsFarming then
+                  instantTP(BankPos)
+                  task.wait(0.4)
+                  interact()
+                  task.wait(1.2)
+               end
 
-               -- 2. Точка продажу
-               moveToPos(SellPos)
+               -- 2. Закупівля
                if not IsFarming then break end
-               task.wait(0.5)
+               instantTP(BuyPos)
+               task.wait(0.4)
                interact()
-               task.wait(1.5)
+               task.wait(1.2)
 
-               -- 3. Точка відмивання
-               moveToPos(LaunderPos)
+               -- 3. Продаж
                if not IsFarming then break end
-               task.wait(0.5)
+               instantTP(SellPos)
+               task.wait(0.4)
                interact()
-               task.wait(1.5)
+               task.wait(1.2)
+
+               -- 4. Відмивання
+               if not IsFarming then break end
+               instantTP(LaunderPos)
+               task.wait(0.4)
+               interact()
+               task.wait(1.2)
             end
          end)
       end
    end,
 })
 
--- Кнопки оновлення координат у разі потреби
-FarmTab:CreateButton({
-   Name = "Оновити точку ЗАКУПІВЛІ (поточна позиція)",
+FarmTab:CreateToggle({
+   Name = "Включити забір грошей (Банк)",
+   CurrentValue = false,
+   Callback = function(val)
+      AutoBank = val
+   end,
+})
+
+-- ========================================================
+-- 2. ВКЛАДКА: НАЛАШТУВАННЯ ТОЧОК (Збереження на місці)
+-- ========================================================
+local SetupTab = Window:CreateTab("Налаштування Точок", 4483362458)
+
+SetupTab:CreateButton({
+   Name = "Записати ПОТОЧНЕ місце як ЗАКУПІВЛЮ",
    Callback = function()
       if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
          BuyPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Успіх", Content = "Точку купівлі оновлено!", Duration = 3 })
+         Rayfield:Notify({ Title = "Точка 1", Content = "Закупівлю оновлено!", Duration = 3 })
       end
    end,
 })
 
-FarmTab:CreateButton({
-   Name = "Оновити точку ПРОДАЖУ (поточна позиція)",
+SetupTab:CreateButton({
+   Name = "Записати ПОТОЧНЕ місце як ПРОДАЖ",
    Callback = function()
       if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
          SellPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Успіх", Content = "Точку продажу оновлено!", Duration = 3 })
+         Rayfield:Notify({ Title = "Точка 2", Content = "Продаж оновлено!", Duration = 3 })
+      end
+   end,
+})
+
+SetupTab:CreateButton({
+   Name = "Записати ПОТОЧНЕ місце як ВІДМИВАННЯ",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         LaunderPos = LocalPlayer.Character.HumanoidRootPart.Position
+         Rayfield:Notify({ Title = "Точка 3", Content = "Відмивання оновлено!", Duration = 3 })
+      end
+   end,
+})
+
+SetupTab:CreateButton({
+   Name = "Записати ПОТОЧНЕ місце як БАНК / ЗНІМАННЯ",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         BankPos = LocalPlayer.Character.HumanoidRootPart.Position
+         Rayfield:Notify({ Title = "Точка Банку", Content = "Знімання грошей оновлено!", Duration = 3 })
       end
    end,
 })
 
 -- ========================================================
--- 2. ВКЛАДКА: ТЕЛЕПОРТИ
--- ========================================================
-local TeleportTab = Window:CreateTab("Телепорти", 4483362458)
-
-TeleportTab:CreateButton({
-   Name = "Політ до закупівлі",
-   Callback = function()
-      IsFarming = true
-      moveToPos(BuyPos)
-      IsFarming = false
-   end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Політ до продажу",
-   Callback = function()
-      IsFarming = true
-      moveToPos(SellPos)
-      IsFarming = false
-   end,
-})
-
--- ========================================================
--- 3. ВКЛАДКА: НАЛАШТУВАННЯ
+-- 3. ВКЛАДКА: СЕРВІС
 -- ========================================================
 local SettingsTab = Window:CreateTab("Налаштування", 4483362458)
 SettingsTab:CreateButton({
    Name = "Вигрузити Скрипт",
    Callback = function()
       IsFarming = false
-      enableNoclip(false)
       Rayfield:Destroy()
    end,
 })
