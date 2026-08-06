@@ -1,101 +1,151 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Auto-Farm Hub",
+   Name = "San Diego Border RP | Fixed Hub",
    LoadingTitle = "Завантаження скрипта...",
    LoadingSubtitle = "by ya_gay",
    ConfigurationSaving = { Enabled = false }
 })
 
--- Сервіси Roblox
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Точні координати з ваших скріншотів
-local BUY_POS = Vector3.new(6820.7, 20.15, 16.6)      -- 1. Закупівля кілець
-local SELL_POS = Vector3.new(-79.56, 40.24, 428.46)   -- 2. Скупник (Продаж)
-local LAUNDER_POS = Vector3.new(6806.9, 17.44, -36.34) -- 3. Відмивання грошей (Launder Cash)
+-- Змінні точок
+local BuyPos = Vector3.new(6820.7, 18.0, 16.6)
+local SellPos = Vector3.new(-79.56, 38.0, 428.46)
+local LaunderPos = Vector3.new(6806.9, 16.0, -36.34)
 
--- Функція плавної левітації/перельоту
-local function floatTo(targetPos, speed)
-   if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-   local hrp = LocalPlayer.Character.HumanoidRootPart
-   local distance = (hrp.Position - targetPos).Magnitude
-   local duration = distance / (speed or 120)
+local IsFarming = false
+local FlySpeed = 100
+local NoclipConn = nil
 
-   local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-   local tween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos)})
-   tween:Play()
-   tween.Completed:Wait()
+-- Noclip (проходження крізь стіни під час польоту)
+local function enableNoclip(state)
+   if state then
+      NoclipConn = RunService.Stepped:Connect(function()
+         if LocalPlayer.Character then
+            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+               if v:IsA("BasePart") then
+                  v.CanCollide = false
+               end
+            end
+         end
+      end)
+   else
+      if NoclipConn then
+         NoclipConn:Disconnect()
+         NoclipConn = nil
+      end
+   end
 end
 
--- Автоматична взаємодія з підказками (E / ProximityPrompt)
-local function interactWithVendor()
-   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-      local myPos = LocalPlayer.Character.HumanoidRootPart.Position
-      for _, obj in pairs(Workspace:GetDescendants()) do
-         if obj:IsA("ProximityPrompt") then
-            local promptPos = obj.Parent:GetPivot().Position
-            if (myPos - promptPos).Magnitude <= 20 then
-               fireproximityprompt(obj)
-            end
+-- Надійна функція перельоту через CFrame Step
+local function moveToPos(targetPos)
+   local char = LocalPlayer.Character
+   if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+   local hrp = char.HumanoidRootPart
+
+   enableNoclip(true)
+
+   while IsFarming and (hrp.Position - targetPos).Magnitude > 4 do
+      local direction = (targetPos - hrp.Position).Unit
+      local distance = (hrp.Position - targetPos).Magnitude
+      local step = math.min(distance, FlySpeed * 0.03)
+      
+      hrp.CFrame = CFrame.new(hrp.Position + direction * step)
+      task.wait(0.01)
+   end
+
+   enableNoclip(false)
+end
+
+-- Взаємодія з промптом
+local function interact()
+   local char = LocalPlayer.Character
+   if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+   
+   for _, prompt in pairs(Workspace:GetDescendants()) do
+      if prompt:IsA("ProximityPrompt") then
+         local dist = (char.HumanoidRootPart.Position - prompt.Parent:GetPivot().Position).Magnitude
+         if dist <= 25 then
+            fireproximityprompt(prompt)
+            break
          end
       end
    end
-   
+
    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-   task.wait(0.1)
+   task.wait(1.2)
    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 end
 
 -- ========================================================
--- 1. ВКЛАДКА: АВТО-ФАРМ
+-- ВКЛАДКА: АВТО-ФАРМ
 -- ========================================================
 local FarmTab = Window:CreateTab("Авто Фарм", 4483362458)
-local FarmRings = false
-local FarmSpeed = 120
 
 FarmTab:CreateSlider({
    Name = "Швидкість польоту",
-   Range = {50, 300},
+   Range = {30, 250},
    Increment = 10,
    Suffix = " studs/s",
-   CurrentValue = 120,
-   Callback = function(Value) FarmSpeed = Value end,
+   CurrentValue = 100,
+   Callback = function(val) FlySpeed = val end,
+})
+
+FarmTab:CreateButton({
+   Name = "Зберегти поточні координати як ЗАКУПІВЛЮ",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         BuyPos = LocalPlayer.Character.HumanoidRootPart.Position
+         Rayfield:Notify({ Title = "Успіх", Content = "Точку купівлі оновлено!", Duration = 3 })
+      end
+   end,
+})
+
+FarmTab:CreateButton({
+   Name = "Зберегти поточні координати як ПРОДАЖ",
+   Callback = function()
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+         SellPos = LocalPlayer.Character.HumanoidRootPart.Position
+         Rayfield:Notify({ Title = "Успіх", Content = "Точку продажу оновлено!", Duration = 3 })
+      end
+   end,
 })
 
 FarmTab:CreateToggle({
-   Name = "Повний Авто-Фарм (Закуп -> Продаж -> Відмивання)",
+   Name = "Старт Авто-Фарму",
    CurrentValue = false,
-   Callback = function(Value)
-      FarmRings = Value
-      if Value then
+   Callback = function(val)
+      IsFarming = val
+      if not val then
+         enableNoclip(false)
+      else
          task.spawn(function()
-            while FarmRings do
-               -- 1. Ллетимо на закупівлю
-               floatTo(BUY_POS, FarmSpeed)
-               if not FarmRings then break end
+            while IsFarming do
+               -- 1. Закупівля
+               moveToPos(BuyPos)
+               if not IsFarming then break end
                task.wait(0.5)
-               interactWithVendor()
+               interact()
                task.wait(1.5)
 
-               -- 2. Ллетимо на продаж
-               floatTo(SELL_POS, FarmSpeed)
-               if not FarmRings then break end
+               -- 2. Продаж
+               moveToPos(SellPos)
+               if not IsFarming then break end
                task.wait(0.5)
-               interactWithVendor()
+               interact()
                task.wait(1.5)
 
-               -- 3. Ллетимо на відмивання грошей
-               floatTo(LAUNDER_POS, FarmSpeed)
-               if not FarmRings then break end
+               -- 3. Відмивання
+               moveToPos(LaunderPos)
+               if not IsFarming then break end
                task.wait(0.5)
-               interactWithVendor()
-               task.wait(2.0)
+               interact()
+               task.wait(1.5)
             end
          end)
       end
@@ -103,56 +153,14 @@ FarmTab:CreateToggle({
 })
 
 -- ========================================================
--- 2. ВКЛАДКА: ТЕЛЕПОРТИ
--- ========================================================
-local TeleportTab = Window:CreateTab("Телепорти", 4483362458)
-
-TeleportTab:CreateButton({
-   Name = "Телепорт: Закупівля кілець",
-   Callback = function() floatTo(BUY_POS, FarmSpeed) end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Телепорт: Скупник (Продаж)",
-   Callback = function() floatTo(SELL_POS, FarmSpeed) end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Телепорт: Пральні машини (Відмивання)",
-   Callback = function() floatTo(LAUNDER_POS, FarmSpeed) end,
-})
-
--- ========================================================
--- 3. ВКЛАДКА: БОЙ / БЕЗСМЕРТЯ
--- ========================================================
-local CombatTab = Window:CreateTab("Бой / Безсмертя", 4483362458)
-local GodmodeEnabled = false
-
-CombatTab:CreateToggle({
-   Name = "Godmode (Безсмертя)",
-   CurrentValue = false,
-   Callback = function(Value)
-      GodmodeEnabled = Value
-      if Value then
-         task.spawn(function()
-            while GodmodeEnabled do
-               if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-                  local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                  hum.MaxHealth = 999999
-                  hum.Health = 999999
-               end
-               task.wait(0.1)
-            end
-         end)
-      end
-   end,
-})
-
--- ========================================================
--- 4. ВКЛАДКА: НАЛАШТУВАННЯ
+-- ВКЛАДКА: НАЛАШТУВАННЯ
 -- ========================================================
 local SettingsTab = Window:CreateTab("Налаштування", 4483362458)
 SettingsTab:CreateButton({
    Name = "Вигрузити Скрипт",
-   Callback = function() Rayfield:Destroy() end,
+   Callback = function()
+      IsFarming = false
+      enableNoclip(false)
+      Rayfield:Destroy()
+   end,
 })
