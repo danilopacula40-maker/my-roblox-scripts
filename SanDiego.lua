@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "San Diego Border RP | Ultimate Hub",
+   Name = "San Diego Border RP | Auto-Farm Hub",
    LoadingTitle = "Завантаження скрипта...",
    LoadingSubtitle = "by ya_gay",
    ConfigurationSaving = { Enabled = false }
@@ -15,14 +15,14 @@ local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- Змінні для координат
-local BuyPos = nil
-local SellPos = nil
-local SavedCFrame = nil
+-- Точні координати з ваших скріншотів
+local BUY_POS = Vector3.new(6820.7, 20.15, 16.6)      -- 1. Закупівля кілець
+local SELL_POS = Vector3.new(-79.56, 40.24, 428.46)   -- 2. Скупник (Продаж)
+local LAUNDER_POS = Vector3.new(6806.9, 17.44, -36.34) -- 3. Відмивання грошей (Launder Cash)
 
--- Функція перельоту (Float)
+-- Функція плавної левітації/перельоту
 local function floatTo(targetPos, speed)
-   if not targetPos or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+   if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
    local hrp = LocalPlayer.Character.HumanoidRootPart
    local distance = (hrp.Position - targetPos).Magnitude
    local duration = distance / (speed or 120)
@@ -33,13 +33,14 @@ local function floatTo(targetPos, speed)
    tween.Completed:Wait()
 end
 
--- Взаємодія з промптами та клавішею E
+-- Автоматична взаємодія з підказками (E / ProximityPrompt)
 local function interactWithVendor()
-   for _, obj in pairs(Workspace:GetDescendants()) do
-      if obj:IsA("ProximityPrompt") then
-         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (LocalPlayer.Character.HumanoidRootPart.Position - obj.Parent:GetPivot().Position).Magnitude
-            if dist < 20 then
+   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+      local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+      for _, obj in pairs(Workspace:GetDescendants()) do
+         if obj:IsA("ProximityPrompt") then
+            local promptPos = obj.Parent:GetPivot().Position
+            if (myPos - promptPos).Magnitude <= 20 then
                fireproximityprompt(obj)
             end
          end
@@ -67,53 +68,34 @@ FarmTab:CreateSlider({
    Callback = function(Value) FarmSpeed = Value end,
 })
 
-FarmTab:CreateButton({
-   Name = "1. Зберегти точку КУПІВЛІ кілець",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         BuyPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Фарм", Content = "Точку купівлі збережено!", Duration = 3 })
-      end
-   end,
-})
-
-FarmTab:CreateButton({
-   Name = "2. Зберегти точку ПРОДАЖУ кілець",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         SellPos = LocalPlayer.Character.HumanoidRootPart.Position
-         Rayfield:Notify({ Title = "Фарм", Content = "Точку продажу збережено!", Duration = 3 })
-      end
-   end,
-})
-
 FarmTab:CreateToggle({
-   Name = "Старт Авто-Фарму (Купівля -> Переліт -> Продаж)",
+   Name = "Повний Авто-Фарм (Закуп -> Продаж -> Відмивання)",
    CurrentValue = false,
    Callback = function(Value)
       FarmRings = Value
       if Value then
-         if not BuyPos or not SellPos then
-            Rayfield:Notify({ Title = "Помилка", Content = "Спочатку збережіть обидві точки!", Duration = 4 })
-            FarmRings = false
-            return
-         end
-
          task.spawn(function()
             while FarmRings do
-               -- Ллетимо на купівлю
-               floatTo(BuyPos, FarmSpeed)
+               -- 1. Ллетимо на закупівлю
+               floatTo(BUY_POS, FarmSpeed)
                if not FarmRings then break end
                task.wait(0.5)
                interactWithVendor()
                task.wait(1.5)
 
-               -- Ллетимо на продаж
-               floatTo(SellPos, FarmSpeed)
+               -- 2. Ллетимо на продаж
+               floatTo(SELL_POS, FarmSpeed)
                if not FarmRings then break end
                task.wait(0.5)
                interactWithVendor()
                task.wait(1.5)
+
+               -- 3. Ллетимо на відмивання грошей
+               floatTo(LAUNDER_POS, FarmSpeed)
+               if not FarmRings then break end
+               task.wait(0.5)
+               interactWithVendor()
+               task.wait(2.0)
             end
          end)
       end
@@ -126,37 +108,18 @@ FarmTab:CreateToggle({
 local TeleportTab = Window:CreateTab("Телепорти", 4483362458)
 
 TeleportTab:CreateButton({
-   Name = "Зберегти поточну позицію",
-   Callback = function()
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         SavedCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
-         Rayfield:Notify({ Title = "Телепорт", Content = "Позицію збережено!", Duration = 2 })
-      end
-   end,
+   Name = "Телепорт: Закупівля кілець",
+   Callback = function() floatTo(BUY_POS, FarmSpeed) end,
 })
 
 TeleportTab:CreateButton({
-   Name = "Телепорт до збереженої позиції",
-   Callback = function()
-      if SavedCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-         floatTo(SavedCFrame.Position, FarmSpeed)
-      end
-   end,
+   Name = "Телепорт: Скупник (Продаж)",
+   Callback = function() floatTo(SELL_POS, FarmSpeed) end,
 })
 
 TeleportTab:CreateButton({
-   Name = "Телепорт: Головний Кордон",
-   Callback = function() floatTo(Vector3.new(120, 15, -450), FarmSpeed) end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Телепорт: Поліцейський Участок",
-   Callback = function() floatTo(Vector3.new(-340, 12, 210), FarmSpeed) end,
-})
-
-TeleportTab:CreateButton({
-   Name = "Телепорт: Спавн Бандитів",
-   Callback = function() floatTo(Vector3.new(520, 10, 890), FarmSpeed) end,
+   Name = "Телепорт: Пральні машини (Відмивання)",
+   Callback = function() floatTo(LAUNDER_POS, FarmSpeed) end,
 })
 
 -- ========================================================
